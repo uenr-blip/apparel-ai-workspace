@@ -1,0 +1,72 @@
+import { beforeEach, describe, expect, it } from "vitest";
+import { prisma } from "@/lib/db";
+import { IDS } from "@/lib/constants";
+import { resetDatabase } from "./helpers";
+import { draftContext, publishContext, resolveContext, listContext } from "@/server/context/context-service";
+import { businessTools } from "@/server/agents/business-tools";
+import { searchOrderAssistant, previewOrderAssistant, confirmOrderAssistant } from "@/server/services/order-assistant";
+const manager = { organizationId: IDS.orgDemo, userId: IDS.userManager, role: "manager", factoryId: null };
+const sales = { ...manager, userId: IDS.userSales, role: "salesperson" };
+const draft = (idempotencyKey: string, baseId: string | null = null) => ({ scope: "company", title: "试用术语", text: "本公司把交期核对称为交期复核。", source: "测试用例，不是一线验收结论", baseId, idempotencyKey });
+describe("统一上下文发布与流程同步", () => {
+  beforeEach(resetDatabase);
+  it("草稿不生效，发布须负责人确认，各模块共享；竞争发布不覆盖，回滚另建版本", async () => {
+    await expect(draftContext(sales, draft("sales-not-allowed"))).rejects.toThrow(/无权/);
+    const first = await draftContext(manager, draft("first-context-draft"));
+    expect(await draftContext(manager, draft("first-context-draft"))).toEqual(first);
+    const stale = await draftContext(manager, draft("competing-context"));
+    expect((await resolveContext(sales,"order")).manifest.references).toHaveLength(0);
+    await expect(publishContext(manager, first.proposalId, false)).rejects.toThrow(/确认/);
+    await publishContext(manager, first.proposalId, true);
+    for (const scope of ["order","workspace","review","design"] as const) {
+      const c = await resolveContext(sales,scope);
+      expect(c.manifest.references[0].revisionId).toBe(first.revisionId);
+      expect(c.instructions).toContain("交期复核");
+    }
+    await expect(publishContext(manager, stale.proposalId, true)).rejects.toThrow(/新版本/);
+    const revised = await draftContext(manager, { ...draft("revised-context",first.revisionId), text: "改为先查资料状态，再核对交期。" });
+    await publishContext(manager, revised.proposalId, true);
+    const rollback = await draftContext(manager, draft("rollback-context",revised.revisionId));
+    await publishContext(manager, rollback.proposalId, true);
+    expect(rollback.revisionId).not.toBe(first.revisionId);
+    expect((await listContext(manager)).versions).toHaveLength(4);
+    const audits = await prisma.auditEvent.findMany({ where: { action: "context.published" } });
+    expect(audits).toHaveLength(3);
+    expect(audits.every(a => a.actorUserId === manager.userId && a.createdAt && JSON.parse(a.payloadJson!).after)).toBe(true);
+  });
+  it("财务上下文不进入普通入口；改发布规则使旧建单预览失效", async () => {
+    const fin = await draftContext(manager, { ...draft("finance-context"), scope: "finance", text: "财务内部核对说明，不对普通入口公开。" });
+    await publishContext(manager,fin.proposalId,true);
+    expect((await resolveContext(sales,"order")).instructions).not.toContain("财务内部核对说明");
+    await expect(resolveContext(sales,"finance")).rejects.toThrow(/无权/);
+    const text = "给北岸服饰建一个针织T恤订单，基础样已确认";
+    const found = await searchOrderAssistant(sales,text);
+    const preview = await previewOrderAssistant(sales,{ text,candidateId: found.candidates[0].id,idempotencyKey:"context-stale-order" });
+    const change = await draftContext(manager,draft("change-before-confirm")); await publishContext(manager,change.proposalId,true);
+    await expect(confirmOrderAssistant(sales,{ proposalId:preview.proposalId,confirmed:true })).rejects.toThrow(/变化|过期/);
+  });
+  it("工作台按交期查订单并读实时门槛，不能越过查询范围取记录", async () => {
+    const order = await prisma.salesOrder.findFirstOrThrow({ where: { organizationId: IDS.orgDemo, orderNo: "DEMO-ORD-001" } });
+    await prisma.salesOrder.update({ where: {id:order.id},data:{requestedDeliveryDate:"2026-09-25",status:"confirmed"} });
+    const registry = businessTools(manager,"workspace","2026-09-24 至 2026-09-30 订单风险");
+    await expect(registry.tools[1].run({orderIds:[order.id]})).rejects.toThrow(/先按交期/);
+    const found = await registry.tools[0].run({from:"2026-09-24",to:"2026-09-30"}) as {orders:{id:string}[]};
+    expect(found.orders.some(o => o.id === order.id)).toBe(true);
+    const row = () => registry.tables[0].rows.find(r => r.href === `/orders/${order.id}`)!;
+    expect(row().cells.slice(2)).toEqual(Array(5).fill("尚未核对"));
+    await prisma.salesOrder.update({ where: {id:order.id},data:{requestedDeliveryDate:"2026-09-26"} });
+    const read = await registry.tools[1].run({orderIds:[order.id]}) as {orders:{deliveryDate:string}[]};
+    expect(read.orders[0].deliveryDate).toBe("2026-09-26");
+    expect(row().cells[1]).toBe("2026-09-26");
+    expect(row().cells[3]).toContain("资料批准");
+    expect(row().cells[3]).not.toContain("尚未核对");
+    for (const pending of registry.tables[0].rows.filter(r => r.href !== `/orders/${order.id}`)) expect(pending.cells[3]).toBe("尚未核对");
+    expect(registry.cards.some(c => c.href === `/orders/${order.id}`)).toBe(true);
+    await expect(registry.tools[0].run({from:"2026-02-30",to:"2026-09-30"})).rejects.toThrow();
+    await registry.tools[0].run({from:"2099-01-01",to:"2099-01-02"});
+    const empty = registry.tables.find(t => t.title.startsWith("2099-01-01"))!;
+    expect(empty.rows).toEqual([]);
+    expect(empty.emptyMessage).toContain("不代表未确认交期的订单没有风险");
+    expect(empty.conclusion?.title).toBe("暂时无法判断交期风险");
+  });
+});

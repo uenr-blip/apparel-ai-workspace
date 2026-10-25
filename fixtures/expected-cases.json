@@ -1,0 +1,86 @@
+{
+  "notice": "以下是虚构测试数据及数学期望，不是客户事实，也不是应用测试已通过的证据。",
+  "procurementAllowanceCase": {
+    "quantityPieces": 1000,
+    "consumptionMetersPerPiece": "1.5",
+    "allowanceRate": "0.03",
+    "consumptionIncludesAllowance": false,
+    "stockOnHandMeters": "170",
+    "stockReservedForOtherOrdersMeters": "50",
+    "eligibleFreeStockMeters": "120",
+    "eligibleTimelyUnallocatedInboundMeters": "200",
+    "minimumOrderMeters": "300",
+    "orderMultipleMeters": "10",
+    "unitPriceCNYPerMeter": "20.00",
+    "expectedGrossRequirementMeters": "1545",
+    "expectedNetRequirementMeters": "1225",
+    "expectedSuggestedPurchaseMeters": "1230",
+    "expectedPurchaseLineAmountCNY": "24600.00",
+    "expectedPurchaseLineAmountMinorCNY": 2460000,
+    "expectedPlannedExcessMeters": "5",
+    "note": "仅演示一条已确认BOM材料行；不代表整件服装全部材料。金额不含其他税费/物流，差额不等同总成本节约。"
+  },
+  "noHistoricalStockCase": {
+    "grossRequirementMeters": "1545",
+    "freeStockUsedMeters": "0",
+    "timelyInboundUsedMeters": "200",
+    "expectedNetMeters": "1345",
+    "expectedPurchaseMeters": "1350",
+    "expectedLineAmountCNY": "27000.00",
+    "expectedNewPurchaseSpendDifferenceVsStockReuseCNY": "2400.00"
+  },
+  "lateInboundCase": {
+    "grossRequirementMeters": "1545",
+    "freeStockUsedMeters": "120",
+    "timelyInboundUsedMeters": "0",
+    "expectedNetMeters": "1425",
+    "expectedPurchaseMeters": "1430",
+    "expectedLineAmountCNY": "28600.00"
+  },
+  "productionConservationCase": {
+    "startedPieces": 1020,
+    "scrappedPieces": 10,
+    "workInProgressPieces": 15,
+    "goodProducedPieces": 995,
+    "goodShippedPieces": 980,
+    "goodRemainingPieces": 15,
+    "incorrectScrapInferencePieces": 40
+  },
+  "reorderCase": {
+    "sourceFile": "01-reorder.txt",
+    "styleCode": "ST-26018",
+    "expectedStyleMasterDelta": 0,
+    "expectedOrderDeltaAfterApproval": 1,
+    "externalCustomerPO": null,
+    "colors": {
+      "海军蓝": 600,
+      "灰色": 400
+    },
+    "totalPieces": 1000,
+    "mustRemainUnconfirmed": [
+      "尺码明细",
+      "罗纹规格与批准",
+      "交期年份推断"
+    ],
+    "mustNotMutate": [
+      "历史订单",
+      "已批准BOM V1"
+    ],
+    "manualSizeCompletion": {
+      "海军蓝": {
+        "XS": 60,
+        "S": 120,
+        "M": 240,
+        "L": 120,
+        "XL": 60
+      },
+      "灰色": {
+        "XS": 40,
+        "S": 80,
+        "M": 160,
+        "L": 80,
+        "XL": 40
+      }
+    }
+  }
+}

@@ -1,0 +1,78 @@
+import { beforeEach, expect, it } from "vitest";
+import { prisma } from "@/lib/db";
+import { IDS } from "@/lib/constants";
+import { resetDatabase } from "./helpers";
+import { getStageWorkspace, saveStageMaterials, previewStageMaterialSource, adoptStageMaterialSource } from "@/server/services/workflow-stage";
+import { createStyleMaster } from "@/server/services/style-create";
+import { createFollowSheet, openFollowAsOrder } from "@/server/services/order-merch";
+import { storeSheetImage } from "@/server/services/sheet-image";
+import { productionConstructionReferences } from "@/server/services/production-construction-reference";
+import { canFactorySeeSheetImage } from "@/server/services/pattern-workflow";
+import { readConstructionImage } from "@/server/services/style-construction";
+import { constructionLibrary } from "@/server/services/construction-library";
+import { readConstruction, type ConstructionItem } from "@/lib/style-construction";
+const actor = { organizationId: IDS.orgDemo, userId: IDS.userSales, role: "salesperson", factoryId: null };
+const factory = { ...actor, userId: IDS.userFactory, role: "factory", factoryId: IDS.factoryYunshan };
+const key = () => crypto.randomUUID();
+const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
+async function setup() {
+  const construction: ConstructionItem[] = (["fabric", "yarn", "regularTrim", "customTrim", "process"] as const).map((group, i) => ({ key: `unified-${i}`, group, name: `统一资料${i}`, fields: group === "process" ? { notes: "左胸按图绣花" } : { composition: "棉", unit: group === "fabric" ? "m" : group === "yarn" ? "kg" : "pcs", consumption: "1.2" } }));
+  const style = await createStyleMaster({ ...actor, code: "UNIFIED-001", name: "统一资料测试款", construction, constructionUploads: [{ key: "unified-0", name: "fabric.png", bytes: png }, { key: "unified-4", name: "process.png", bytes: png }] });
+  const photo = await storeSheetImage(actor.organizationId, png, actor.userId);
+  const sample = await createFollowSheet({ ...actor, kind: "sales_sample", title: "客户确认销售样", customerId: IDS.customerNorthshore, idempotencyKey: key(), initialStyles: [{ styleCode: "UNIFIED-001", styleName: "统一资料测试款", salesSample: { po: "OLD-PO", numericCode: "166610", salesSample: "20", totalPrice: "9999", mainLabel: "P-ML", pictures: { mainLabel: [photo.imageSrc] }, elements: [{ id: "old-extra", label: "客户指定工艺补充", text: "按原图打枣", images: [photo.imageSrc] }] } }] });
+  const row = await prisma.orderMerchStyle.findFirstOrThrow({ where: { sheetId: sample.sheetId } });
+  const before = await getStageWorkspace(actor, { followRowId: row.id });
+  await saveStageMaterials(actor, { target: before.target, expectedStamp: before.stamp, rows: before.rows, reason: "按客户确认留档", ownerId: actor.userId, requestKey: key() });
+  const saved = await getStageWorkspace(actor, before.target);
+  const bulk = await createFollowSheet({ ...actor, kind: "bulk", title: "已有大货待接续", customerId: IDS.customerNorthshore, factoryId: IDS.factoryYunshan, factoryName: "云杉", idempotencyKey: key(), initialStyles: [{ styleCode: "UNIFIED-001", styleName: "统一资料测试款", salesSample: { numericCode: "166610" }, bulk: { po: "NEW-PO", shipDate: "2026-10-31", colors: [{ guestColor: "白色", qtyText: "120" }] } }] });
+  const bulkRow = await prisma.orderMerchStyle.findFirstOrThrow({ where: { sheetId: bulk.sheetId } });
+  const input = { target: { followRowId: bulkRow.id }, source: { revisionId: saved.revisionId! }, reason: "核对销售样全部物料和工艺后沿用" };
+  return { style, row, saved, bulk, bulkRow, input, photo };
+}
+beforeEach(resetDatabase);
+it("已有大货人工选来源，五类资料和图完整带入，旧批次不变，工厂只看本单固定资料", async () => {
+  const f = await setup(); const orders = await prisma.salesOrder.count();
+  const board = await getStageWorkspace(actor, f.input.target); expect(board.sources.some(s => "revisionId" in s.source && s.source.revisionId === f.saved.revisionId)).toBe(true);
+  const p = await previewStageMaterialSource(actor, f.input); expect(p.rows).toHaveLength(5); expect(p.references.some(r => r.text === "按原图打枣")).toBe(true);
+  expect(JSON.stringify(p)).not.toContain("OLD-PO"); expect(JSON.stringify(p)).not.toContain("9999"); expect(JSON.stringify(p)).not.toContain("construction/org-demo");
+  const requestKey = key(), a = await adoptStageMaterialSource(actor, f.input, p.stamp, requestKey, true);
+  expect(await adoptStageMaterialSource(actor, f.input, p.stamp, requestKey, true)).toEqual(a);
+  expect(await prisma.salesOrder.count()).toBe(orders); expect(await prisma.orderMerchStyle.findUnique({ where: { id: f.bulkRow.id } })).toEqual(f.bulkRow);
+  const now = await getStageWorkspace(actor, f.input.target); expect(now.rows).toEqual(f.saved.rows); expect(now.history).toHaveLength(1);
+  const audit = await prisma.auditEvent.findFirstOrThrow({ where: { entityId: a.stageId, action: "workflow.materials_adopted" } }); expect(audit.actorUserId).toBe(actor.userId); expect(JSON.parse(audit.payloadJson!).afterReferences.length).toBeGreaterThan(0);
+  await saveStageMaterials(actor, { target: f.saved.target, expectedStamp: f.saved.stamp, rows: f.saved.rows.map(r => ({ ...r, fields: { ...r.fields, notes: "来源后来修改" } })), reason: "来源新修订", ownerId: actor.userId, requestKey: key() });
+  expect((await getStageWorkspace(actor, f.input.target)).rows[0].fields.notes).not.toBe("来源后来修改");
+  const opened = await openFollowAsOrder({ ...actor, sheetId: f.bulk.sheetId, customerId: IDS.customerNorthshore, idempotencyKey: key() });
+  const line = await prisma.orderLine.findFirstOrThrow({ where: { orderId: opened.orderId }, include: { version: true } });
+  expect(readConstruction(line.version?.constructionJson)).toHaveLength(5); expect(line.version?.status).toBe("draft");
+  expect((await readConstructionImage({ ...factory, styleId: f.style.styleId, versionId: line.styleVersionId!, key: "unified-4" })).bytes).toEqual(png);
+  const refs = await productionConstructionReferences(actor.organizationId, opened.orderId); expect(refs[line.id].some(r => r.text === "按原图打枣")).toBe(true);
+  expect(await canFactorySeeSheetImage(factory, f.photo.imageSrc.split("/").pop()!)).toBe(true);
+  await prisma.salesOrder.update({ where: { id: opened.orderId }, data: { factoryId: null } });
+  expect(await canFactorySeeSheetImage(factory, f.photo.imageSrc.split("/").pop()!)).toBe(false);
+  // A transferred/split order can share the approved source version without owning the original follow row.
+  const otherLine = await prisma.orderLine.findFirstOrThrow({ where: { orderId: { not: opened.orderId }, order: { organizationId: actor.organizationId } } });
+  await prisma.salesOrder.update({ where: { id: otherLine.orderId }, data: { factoryId: null } });
+  await prisma.orderLine.update({ where: { id: otherLine.id }, data: { styleId: f.style.styleId, styleVersionId: line.styleVersionId } });
+  expect((await productionConstructionReferences(actor.organizationId, otherLine.orderId))[otherLine.id].some(r => r.text === "按原图打枣")).toBe(true);
+
+  await expect(readConstructionImage({ ...factory, styleId: f.style.styleId, versionId: line.styleVersionId!, key: "unified-4" })).rejects.toThrow("无权");
+  await expect(previewStageMaterialSource(actor, f.input)).rejects.toThrow("修订");
+});
+it("来源或规则变动拒绝旧确认，未确认及越权拒绝，选库与原规格不被改变", async () => {
+  const f = await setup(), p = await previewStageMaterialSource(actor, f.input);
+  await expect(adoptStageMaterialSource(actor, f.input, p.stamp, key(), false)).rejects.toThrow("确认");
+  await expect(previewStageMaterialSource(factory, f.input)).rejects.toThrow("无权");
+  await expect(previewStageMaterialSource({ ...actor, organizationId: "other" }, f.input)).rejects.toThrow("无权");
+  await prisma.orderMerchStyle.update({ where: { id: f.row.id }, data: { salesSampleJson: JSON.stringify({ mainLabel: "新要求" }) } });
+  await expect(adoptStageMaterialSource(actor, f.input, p.stamp, key(), true)).rejects.toThrow("变化");
+  const fresh = await previewStageMaterialSource(actor, f.input);
+  await prisma.organizationPolicy.create({ data: { id: key(), organizationId: actor.organizationId, key: "context:active:follow", valueJson: '{"revision":100}', note: "换规则" } });
+  await expect(adoptStageMaterialSource(actor, f.input, fresh.stamp, key(), true)).rejects.toThrow("变化");
+  await prisma.orderMerchSheet.update({ where: { id: f.row.sheetId }, data: { customerId: null } });
+  await expect(previewStageMaterialSource(actor, f.input)).rejects.toThrow("同客户同款");
+  const material = await prisma.material.findUniqueOrThrow({ where: { id: f.saved.rows[0].materialId } });
+  expect((await constructionLibrary(actor.organizationId)).find(m => m.id === material.id)?.hasImage).toBe(true);
+  expect(await constructionLibrary("other")).toEqual([]);
+  expect(await prisma.material.findUnique({ where: { id: material.id } })).toEqual(material);
+});

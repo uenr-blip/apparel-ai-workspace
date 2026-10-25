@@ -1,0 +1,35 @@
+"use client";
+import { useState } from "react";
+import { CurrencySelect,Field,FormResult,Lookup,tradeField,useTradeCommand } from "../../finance/trade-form-parts";
+import type { TradeOption } from "@/server/services/trade-lookup";
+const endpoint="/api/material-ledger/lookup";
+export function ReceiveMaterialForm(){
+  const state=useTradeCommand("/api/material-ledger"),[order,setOrder]=useState<TradeOption|null>(null),[material,setMaterial]=useState<TradeOption|null>(null),[supplier,setSupplier]=useState<TradeOption|null>(null),[location,setLocation]=useState<TradeOption|null>(null),[purchase,setPurchase]=useState<TradeOption|null>(null),[inbound,setInbound]=useState<TradeOption|null>(null),[color,setColor]=useState("");
+  return <form className="space-y-4" onSubmit={e=>void state.submit(e,{action:"receive",orderId:order?.id,materialId:material?.id,supplierId:supplier?.id,locationId:location?.id,purchaseDraftId:purchase?.id??"",inboundLotId:inbound?.id??""})}>
+    <p className="text-sm leading-6">仅登记实际已收到、验收并放行的公司材料。保存后增加本批次在手；不会下达采购。待检或未到货材料请保留在原跟进流程。</p>
+    <Lookup label="采购关联订单" kind="orders" endpoint={endpoint} selected={order} onSelect={v=>{setOrder(v);setPurchase(null);}} /><Lookup label="材料与原始单位" kind="materials" endpoint={endpoint} selected={material} onSelect={setMaterial}/><Lookup label="供货方" kind="suppliers" endpoint={endpoint} selected={supplier} onSelect={setSupplier}/><Lookup label="实际收料地点" kind="locations" endpoint={endpoint} selected={location} onSelect={setLocation}/>
+    <div className="grid gap-3 sm:grid-cols-2"><Field label="颜色 / 批次特征"><input name="colorName" value={color} onChange={e=>setColor(e.target.value)} required maxLength={120} className={tradeField}/></Field><Field label="实收数量（材料原始单位，最多3位小数）"><input name="qty" required inputMode="decimal" maxLength={30} className={tradeField}/></Field></div>
+    <Field label="收料凭证号 / 送货单分行号"><input name="reference" required maxLength={120} placeholder="同一送货单多批次请加分行号" className={tradeField}/></Field><Field label="实际收料日期"><input name="occurredOn" type="date" required className={tradeField}/></Field>
+    {material&&supplier?<Lookup label="对应的既有在途（有记录时必选）" kind="inbound" endpoint={endpoint} materialId={material.id} partyId={supplier.id} selected={inbound} onSelect={v=>{setInbound(v);setPurchase(null);if(v?.colorName)setColor(v.colorName);}}/>:null}
+    {order&&!inbound?<details><summary className="cursor-pointer text-sm">引用已有采购草稿（可选）</summary><Lookup label="采购草稿" kind="purchases" endpoint={endpoint} orderId={order.id} selected={purchase} onSelect={setPurchase}/></details>:null}
+    <Field label="收料及验收依据"><textarea name="basis" required maxLength={2000} rows={3} className={tradeField}/></Field><FormResult state={state} label="确认实际收料" disabled={!order||!material||!supplier||!location} href="/resources/material-ledger/:id"/>
+  </form>;
+}
+export function MaterialPriceForm({id,version,currency:initial,unitPrice,legacy=false}:{id:string;version:number;currency?:string|null;unitPrice?:string|null;legacy?:boolean}){
+  const state=useTradeCommand("/api/material-ledger"),[currency,setCurrency]=useState(initial??"CNY");
+  return <form className="space-y-4" onSubmit={e=>void state.submit(e,{action:legacy?"value_use":"value_receipt",id,expectedVersion:version})}><p className="text-sm leading-6">{legacy?"为历史领用补充实际计价依据，不改历史库存。":"保存独立计价版本。当前已登记耗用成本会按新价重新核对，相关应付差异需另行确认。币种一经计价不能直接变更。"}</p><Field label="计价币种"><CurrencySelect value={currency} onChange={setCurrency}/></Field><Field label="每原始单位的材料单价（最多6位小数）"><input name="unitPrice" defaultValue={unitPrice??""} inputMode="decimal" required maxLength={30} className={tradeField}/></Field><Field label="单价与修订依据"><textarea name="basis" required maxLength={2000} rows={3} className={tradeField}/></Field><FormResult state={state} label="保存计价依据"/></form>;
+}
+export function MaterialActionForm({action,id,version,billId,billVersion,receiptId}:{action:string;id:string;version?:number;billId?:string;billVersion?:number;receiptId?:string}){
+  const state=useTradeCommand("/api/material-ledger"),[lot,setLot]=useState<TradeOption|null>(null),[order,setOrder]=useState<TradeOption|null>(null),[reverse,setReverse]=useState(false);
+  return <form className="space-y-4" onSubmit={e=>void state.submit(e,{action,id,...(version?{expectedVersion:version}:{}),...(billId?{billId,expectedBillVersion:billVersion}:{}),...(action==="return_supplier"?{lotId:lot?.id}:{}),...((action==="assign_use"||action==="release_reservation")?{orderId:order?.id}:{}),...(action==="return_use"?{reverse}:{})})}>
+    {action==="return_supplier"?<Lookup label="实际退供批次" kind="receipt_lots" endpoint={endpoint} receiptId={receiptId??id} selected={lot} onSelect={setLot}/>:null}
+    {(action==="assign_use"||action==="release_reservation")?<><p className="text-sm">选择实际耗用所属订单；不会再次扣库存。已归单的领用不能直接改属其他单。</p><Lookup label="实际耗用订单" kind="orders" endpoint={endpoint} selected={order} onSelect={setOrder}/></>:null}
+    {action==="return_supplier"||action==="return_use"||action==="release_reservation"?<Field label="本次数量（原始单位）"><input name="qty" required inputMode="decimal" maxLength={30} className={tradeField}/></Field>:null}
+    {action==="return_use"?<label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={reverse} onChange={e=>setReverse(e.target.checked)}/>这是录入错误的冲销（须填写全部剩余净领用数量）</label>:null}
+    {action==="sync_payable"?<p className="text-sm leading-6">按当前净收料数量和计价版本形成独立应付扣补。若调整后低于已核销金额，需要先核对并撤回相应核销；不会自动退款或付款。</p>:null}
+    {action==="reverse_receipt"?<p className="text-sm leading-6">先处理关联应付及后续退供、调拨、领用与占用，再冲销原收料。原凭证与计价记录保留。</p>:null}
+    <Field label="本次依据与原因"><textarea name="basis" required maxLength={2000} rows={3} className={tradeField}/></Field><FormResult state={state} label="核对后办理" disabled={(action==="return_supplier"&&!lot)||(["assign_use","release_reservation"].includes(action)&&!order)}/>
+  </form>;
+}
+export function ReverseTransferForm(){const state=useTradeCommand("/api/material-ledger"),[transfer,setTransfer]=useState<TradeOption|null>(null);return <form className="space-y-4" onSubmit={e=>void state.submit(e,{action:"reverse_transfer",id:transfer?.id})}><p className="text-sm">调入批次须仍有足量可用材料；冲销会把相同数量归还调出批次，保留正反凭证。</p><Lookup label="原调拨凭证" kind="transfers" endpoint={endpoint} selected={transfer} onSelect={setTransfer}/><Field label="冲销依据"><textarea name="basis" required rows={3} maxLength={2000} className={tradeField}/></Field><FormResult state={state} label="确认反向冲销" disabled={!transfer}/></form>;}
+export function CostTagForm({id,active}:{id:string;active:boolean}){const state=useTradeCommand("/api/material-ledger");return <form className="space-y-4" onSubmit={e=>void state.submit(e,{action:"tag_cost",id,active})}><p className="text-sm">只归集本单已确认的其他应付。金额随原单扣补和作废同步，材料采购与加工不可再重复计入。</p><Field label="费用类别"><select name="kind" className={tradeField}><option value="freight">物流费用</option><option value="other">其他直接费用</option></select></Field><Field label="归集依据"><textarea name="basis" required rows={3} maxLength={2000} className={tradeField}/></Field><FormResult state={state} label={active?"确认归入成本":"撤销费用归集"}/></form>;}

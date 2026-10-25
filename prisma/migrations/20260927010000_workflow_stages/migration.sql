@@ -1,0 +1,14 @@
+ALTER TABLE "PatternRevision" ADD COLUMN "stageRevisionId" TEXT;
+CREATE TABLE "WorkflowStage" ("id" TEXT NOT NULL PRIMARY KEY, "organizationId" TEXT NOT NULL, "kind" TEXT NOT NULL, "projectId" TEXT, "followRowId" TEXT, "styleId" TEXT, "ownerId" TEXT NOT NULL, "sourceRevisionId" TEXT, "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, "updatedAt" DATETIME NOT NULL);
+CREATE UNIQUE INDEX "WorkflowStage_projectId_key" ON "WorkflowStage"("projectId");
+CREATE UNIQUE INDEX "WorkflowStage_followRowId_key" ON "WorkflowStage"("followRowId");
+CREATE INDEX "WorkflowStage_organizationId_kind_idx" ON "WorkflowStage"("organizationId", "kind");
+CREATE TABLE "WorkflowRevision" ("id" TEXT NOT NULL PRIMARY KEY, "stageId" TEXT NOT NULL, "number" INTEGER NOT NULL, "constructionJson" TEXT NOT NULL DEFAULT '[]', "reason" TEXT NOT NULL, "sourceSnapshotJson" TEXT NOT NULL DEFAULT '{}', "createdBy" TEXT NOT NULL, "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, CONSTRAINT "WorkflowRevision_stageId_fkey" FOREIGN KEY ("stageId") REFERENCES "WorkflowStage"("id") ON DELETE RESTRICT ON UPDATE CASCADE);
+CREATE UNIQUE INDEX "WorkflowRevision_stageId_number_key" ON "WorkflowRevision"("stageId", "number");
+CREATE TABLE "WorkflowTransfer" ("id" TEXT NOT NULL PRIMARY KEY, "organizationId" TEXT NOT NULL, "sourceStageId" TEXT NOT NULL, "sourceRevisionId" TEXT NOT NULL, "sourceVersionKey" TEXT NOT NULL DEFAULT '', "targetStageId" TEXT NOT NULL, "targetSheetId" TEXT NOT NULL, "targetRowId" TEXT NOT NULL, "kind" TEXT NOT NULL, "batchKey" TEXT NOT NULL, "requestKey" TEXT NOT NULL, "requestHash" TEXT NOT NULL, "snapshotJson" TEXT NOT NULL, "createdBy" TEXT NOT NULL, "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP);
+CREATE UNIQUE INDEX "WorkflowTransfer_targetStageId_key" ON "WorkflowTransfer"("targetStageId");
+CREATE UNIQUE INDEX "WorkflowTransfer_organizationId_requestKey_key" ON "WorkflowTransfer"("organizationId", "requestKey");
+CREATE UNIQUE INDEX "WorkflowTransfer_sourceVersionKey_kind_batchKey_key" ON "WorkflowTransfer"("sourceVersionKey", "kind", "batchKey");
+CREATE TABLE "WorkflowParticipant" ("stageId" TEXT NOT NULL, "userId" TEXT NOT NULL, PRIMARY KEY ("stageId", "userId"), CONSTRAINT "WorkflowParticipant_stageId_fkey" FOREIGN KEY ("stageId") REFERENCES "WorkflowStage"("id") ON DELETE RESTRICT ON UPDATE CASCADE);
+CREATE TABLE "WorkflowRead" ("organizationId" TEXT NOT NULL, "auditId" TEXT NOT NULL, "userId" TEXT NOT NULL, "readAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY ("auditId", "userId"));
+CREATE INDEX "WorkflowRead_organizationId_userId_idx" ON "WorkflowRead"("organizationId", "userId");

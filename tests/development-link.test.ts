@@ -1,0 +1,68 @@
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { prisma } from "@/lib/db";
+import { IDS } from "@/lib/constants";
+import { createDevelopmentProject } from "@/server/services/development-create";
+import { adoptReuseCandidate, linkProjectToStyle, rejectReuseCandidate } from "@/server/services/reuse";
+import * as audit from "@/server/services/intake";
+import { resetDatabase } from "./helpers";
+const actor = { organizationId: IDS.orgDemo, userId: IDS.userSales, role: "salesperson" };
+beforeEach(resetDatabase);
+afterEach(() => vi.restoreAllMocks());
+it("关联主款同步待补标记，重复请求不重写，不能覆盖原主款，审计含前后值", async () => {
+  const project = await createDevelopmentProject({ ...actor, name: "关联核对" });
+  const input = { ...actor, projectId: project.projectId, styleId: IDS.styleSt26018 };
+  await linkProjectToStyle(input);
+  expect((await linkProjectToStyle(input)).reused).toBe(true);
+  const current = await prisma.developmentProject.findUniqueOrThrow({ where: { id: project.projectId } });
+  expect(JSON.parse(current.unknownsJson)).not.toContain("尚未关联款号"); expect(JSON.parse(current.unknownsJson)).toContain("手感待测");
+  const log = await prisma.auditEvent.findMany({ where: { entityId: project.projectId, action: "development.linked_style" } });
+  expect(log).toHaveLength(1); expect(log[0].actorUserId).toBe(actor.userId); expect(JSON.parse(log[0].payloadJson!).before.styleId).toBeNull(); expect(JSON.parse(log[0].payloadJson!).after.styleId).toBe(IDS.styleSt26018);
+  const another = await prisma.style.findFirstOrThrow({ where: { organizationId: actor.organizationId, id: { not: IDS.styleSt26018 } } });
+  await expect(linkProjectToStyle({ ...input, styleId: another.id })).rejects.toThrow(/不能直接覆盖/);
+});
+it("工厂、撤销账号及外组织不能关联，审计失败回滚关联", async () => {
+  const project = await createDevelopmentProject({ ...actor, name: "权限核对" });
+  const input = { ...actor, projectId: project.projectId, styleId: IDS.styleSt26018 };
+  await expect(linkProjectToStyle({ ...input, userId: IDS.userFactory })).rejects.toThrow(/无权/);
+  await expect(linkProjectToStyle({ ...input, userId: IDS.userIso, organizationId: IDS.orgIso })).rejects.toThrow();
+  vi.spyOn(audit, "writeAudit").mockRejectedValue(new Error("audit failure"));
+  await expect(linkProjectToStyle(input)).rejects.toThrow("audit failure");
+  expect((await prisma.developmentProject.findUniqueOrThrow({ where: { id: project.projectId } })).styleId).toBeNull();
+  vi.restoreAllMocks();
+  await prisma.user.update({ where: { id: actor.userId }, data: { active: false } });
+  await expect(linkProjectToStyle(input)).rejects.toThrow(/无权/);
+});
+it("新建开发的项目、材料引用、待办与审计同成同败，伪造角色不能写入", async () => {
+  const counts = [await prisma.developmentProject.count(), await prisma.developmentCandidate.count(), await prisma.taskItem.count()];
+  await expect(createDevelopmentProject({ ...actor, role: "manager", name: "伪造角色" })).rejects.toThrow(/当前账号/);
+  vi.spyOn(audit, "writeAudit").mockRejectedValue(new Error("audit failure"));
+  await expect(createDevelopmentProject({ ...actor, name: "回滚检查", materialIds: [IDS.materialMat001] })).rejects.toThrow("audit failure");
+  expect([await prisma.developmentProject.count(), await prisma.developmentCandidate.count(), await prisma.taskItem.count()]).toEqual(counts);
+});
+it("旧资料引用入口校验实际身份；重复采用只留一条，审计含依据，失败整笔回滚", async () => {
+  const project = await createDevelopmentProject({ ...actor, name: "引用核对" });
+  const input = { ...actor, projectId: project.projectId, candidateKind: "style" as const, candidateId: IDS.styleSt26018, query: "ST-26018" };
+  await expect(adoptReuseCandidate({ ...input, userId: IDS.userFactory })).rejects.toThrow(/无权/);
+  vi.spyOn(audit, "writeAudit").mockRejectedValue(new Error("audit failure"));
+  await expect(adoptReuseCandidate(input)).rejects.toThrow("audit failure");
+  expect(await prisma.developmentCandidate.count({ where: { projectId: project.projectId } })).toBe(0);
+  expect(await prisma.knowledgeReuseEvent.count({ where: { adoptedProjectId: project.projectId } })).toBe(0);
+  vi.restoreAllMocks();
+  const first = await adoptReuseCandidate(input);
+  expect(await adoptReuseCandidate(input)).toEqual(first);
+  expect(await prisma.knowledgeReuseEvent.count({ where: { adoptedProjectId: project.projectId } })).toBe(1);
+  const log = await prisma.auditEvent.findFirstOrThrow({ where: { action: "reuse.adopted", entityId: project.projectId } });
+  expect(JSON.parse(log.payloadJson!).basis.query).toBe(input.query);
+  expect(JSON.parse(log.payloadJson!).after.sourceId).toBe(input.candidateId);
+  const reject = { ...input, reason: "规格未确认" };
+  await expect(rejectReuseCandidate({ ...reject, userId: IDS.userFactory })).rejects.toThrow(/无权/);
+  await expect(rejectReuseCandidate({ ...reject, organizationId: IDS.orgIso, userId: IDS.userIso })).rejects.toThrow();
+  const eventCount = await prisma.knowledgeReuseEvent.count();
+  vi.spyOn(audit, "writeAudit").mockRejectedValue(new Error("audit failure"));
+  await expect(rejectReuseCandidate(reject)).rejects.toThrow("audit failure");
+  expect(await prisma.knowledgeReuseEvent.count()).toBe(eventCount);
+  vi.restoreAllMocks();
+  await rejectReuseCandidate(reject); await rejectReuseCandidate(reject);
+  // Rejection is a decision record. A later identical reason must not erase a new decision.
+  expect(await prisma.knowledgeReuseEvent.count()).toBe(eventCount + 2);
+});

@@ -1,0 +1,17 @@
+[虚构演示资料，不是实际客户订单]
+From: Northshore Apparel <buying@northshore.example>
+To: sales@demo.local
+Subject: Repeat ST-26018 — cuff change, PO later
+Date: 18 Sep 2026
+
+Hi,
+
+Please repeat ST-26018, same confirmed style as last time.
+Navy 600 pcs, Grey 400 pcs, total 1000 pcs.
+Change cuffs to rib.
+Delivery: 20 October.
+Customer PO not yet provided.
+Size breakdown and rib spec to follow.
+
+Thanks
+Northshore Apparel Buying

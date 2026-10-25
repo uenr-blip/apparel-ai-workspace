@@ -1,0 +1,11 @@
+ALTER TABLE "Style" ADD COLUMN "archivedAt" DATETIME;
+ALTER TABLE "Material" ADD COLUMN "archivedAt" DATETIME;
+ALTER TABLE "Customer" ADD COLUMN "archivedAt" DATETIME;
+ALTER TABLE "Party" ADD COLUMN "archivedAt" DATETIME;
+ALTER TABLE "DevelopmentProject" ADD COLUMN "archivedAt" DATETIME;
+ALTER TABLE "OrderMerchSheet" ADD COLUMN "archivedAt" DATETIME;
+ALTER TABLE "SalesOrder" ADD COLUMN "archivedAt" DATETIME;
+ALTER TABLE "StyleOption" ADD COLUMN "archivedAt" DATETIME;
+CREATE TABLE "StyleCodeAlias" ("id" TEXT NOT NULL PRIMARY KEY, "organizationId" TEXT NOT NULL, "styleId" TEXT NOT NULL, "code" TEXT NOT NULL, "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP);
+CREATE UNIQUE INDEX "StyleCodeAlias_organizationId_code_key" ON "StyleCodeAlias"("organizationId", "code");
+CREATE INDEX "StyleCodeAlias_styleId_idx" ON "StyleCodeAlias"("styleId");

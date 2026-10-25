@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 480" role="img" aria-label="garment illustration">
+  <rect width="400" height="480" fill="#F4EFE6"/>
+  <path d="M140 70l-70 46 28 42 42-18v210h100V140l42 18 28-42-70-46-18 24h-64z" fill="#8A6A3D" stroke="#1C1B19" stroke-width="4"/>
+  <circle cx="200" cy="58" r="26" fill="none" stroke="#1C1B19" stroke-width="4"/>
+  <text x="200" y="430" text-anchor="middle" font-size="16" fill="#5E5A53">illustration</text>
+</svg>

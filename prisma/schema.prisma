@@ -1,0 +1,1498 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Organization {
+  id        String   @id
+  code      String   @unique
+  name      String
+  demoNote  String
+  timezone  String   @default("Asia/Shanghai")
+  createdAt DateTime @default(now())
+
+  users            User[]
+  customers        Customer[]
+  parties          Party[]
+  styles           Style[]
+  materials        Material[]
+  orders           SalesOrder[]
+  sources          SourceDocument[]
+  aiJobs           AiJob[]
+  proposals        ActionProposal[]
+  tasks            TaskItem[]
+  audits           AuditEvent[]
+  policies         OrganizationPolicy[]
+  lots             InventoryLot[]
+  quotes           SupplierQuote[]
+  sizeScales       SizeScale[]
+  developmentProjects DevelopmentProject[]
+  designProjects   DesignProject[]
+  reuseEvents      KnowledgeReuseEvent[]
+  seasons          Season[]
+  designers        Designer[]
+  styleOptions     StyleOption[]
+  purchaseDrafts   PurchaseDraft[]
+  orderMerchSheets OrderMerchSheet[]
+  packingPlans     PackingPlan[]
+  reconDrafts      FactoryReconDraft[]
+  inventoryMovements InventoryMovement[]
+  tradeBook TradeBook?
+  tradeOperations TradeOperation[]
+  tradeContracts TradeContract[]
+  tradeBills TradeBill[]
+  tradeCash TradeCash[]
+  tradeAllocations TradeAllocation[]
+  tradeAdjustments TradeAdjustment[]
+  tradeDocuments TradeDocument[]
+  materialReceipts MaterialReceipt[]
+  materialValuations MaterialValuation[]
+  materialOrigins MaterialLotOrigin[]
+  materialUses MaterialUse[]
+  materialEvents MaterialEvent[]
+  orderCostTags OrderCostTag[]
+  treasuryRefunds TreasuryRefund[]
+  treasuryFx TreasuryFx[]
+  treasuryLegs TreasuryLeg[]
+  ledgerBooks GLBook[]
+}
+
+model OrganizationPolicy {
+  id             String  @id
+  organizationId String
+  key            String
+  enabled        Boolean @default(true)
+  note           String
+  valueJson      String  @default("{}")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, key])
+}
+
+model User {
+  id             String   @id
+  organizationId String
+  email          String   @unique
+  name           String
+  role           String
+  passwordHash   String
+  factoryId      String?
+  avatarPath     String   @default("")
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  factory      Party?       @relation("FactoryUsers", fields: [factoryId], references: [id])
+  audits       AuditEvent[]
+  executions   ActionExecution[]
+  createdOrders SalesOrder[] @relation("OrderCreator")
+  createdStyles Style[]      @relation("StyleCreator")
+  createdDesignProjects DesignProject[] @relation("DesignCreator")
+}
+
+model Customer {
+  archivedAt DateTime?
+  id             String @id
+  organizationId String
+  code           String
+  name           String
+  demoNote       String
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  orders       SalesOrder[]
+
+  @@unique([organizationId, code])
+}
+
+model Party {
+  archivedAt DateTime?
+  id             String @id
+  organizationId String
+  kind           String
+  code           String
+  name           String
+  demoNote       String
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  users        User[]       @relation("FactoryUsers")
+  quotes       SupplierQuote[]
+  lots         InventoryLot[]
+  orders       SalesOrder[] @relation("OrderFactory")
+
+  @@unique([organizationId, code])
+}
+
+model Style {
+  archivedAt DateTime?
+  id             String   @id
+  organizationId String
+  code           String
+  name           String
+  category       String
+  silhouette     String
+  status         String
+  imagePath      String
+  demoNote       String
+  designerId     String?
+  createdByUserId String?
+  brandOptionId  String?
+  categoryOptionId String?
+  typeOptionId   String?
+  yearOptionId   String?
+  createdAt      DateTime @default(now())
+
+  organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  designer     Designer?      @relation(fields: [designerId], references: [id], onDelete: SetNull)
+  createdBy    User?          @relation("StyleCreator", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  brandOption  StyleOption?   @relation("StyleBrandOption", fields: [brandOptionId], references: [id], onDelete: SetNull)
+  categoryOption StyleOption? @relation("StyleCategoryOption", fields: [categoryOptionId], references: [id], onDelete: SetNull)
+  typeOption   StyleOption?   @relation("StyleTypeOption", fields: [typeOptionId], references: [id], onDelete: SetNull)
+  yearOption   StyleOption?   @relation("StyleYearOption", fields: [yearOptionId], references: [id], onDelete: SetNull)
+  versions     StyleVersion[]
+  orderLines   OrderLine[]
+  tasks        TaskItem[]
+  skus         Sku[]
+  developmentProjects DevelopmentProject[]
+  developmentCandidates DevelopmentCandidate[]
+  designProjects DesignProject[]
+  seasonLinks      StyleSeason[]
+
+  @@unique([organizationId, code])
+}
+
+model StyleVersion {
+  id               String    @id
+  styleId          String
+  versionNumber    Int
+  status           String
+  cuffType         String
+  changeSummary    String
+  specNotes        String    @default("")
+  processNotes     String    @default("")
+  patternRevision  String    @default("")
+  constructionJson String    @default("[]")
+  sourceDocumentId String?
+  approvedAt       DateTime?
+  approvedByName   String?
+  createdAt        DateTime  @default(now())
+
+  style       Style                   @relation(fields: [styleId], references: [id], onDelete: Cascade)
+  bomLines    BomLine[]
+  orderLines  OrderLine[]
+  attachments StyleVersionAttachment[]
+
+  @@unique([styleId, versionNumber])
+}
+
+model StyleVersionAttachment {
+  id             String   @id
+  styleVersionId String
+  kind           String
+  fileName       String
+  storagePath    String
+  mimeType       String
+  createdAt      DateTime @default(now())
+
+  version StyleVersion @relation(fields: [styleVersionId], references: [id], onDelete: Cascade)
+}
+
+model Season {
+  id             String @id
+  organizationId String
+  code           String
+  name           String
+  sort           Int    @default(0)
+  demoNote       String @default("")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  styles       StyleSeason[]
+
+  @@unique([organizationId, code])
+}
+
+model StyleSeason {
+  id       String @id
+  styleId  String
+  seasonId String
+
+  style  Style  @relation(fields: [styleId], references: [id], onDelete: Cascade)
+  season Season @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+
+  @@unique([styleId, seasonId])
+}
+
+model Designer {
+  id             String   @id
+  organizationId String
+  name           String
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  styles       Style[]
+
+  @@unique([organizationId, name])
+}
+
+model StyleOption {
+  archivedAt DateTime?
+  id             String  @id
+  organizationId String
+  kind           String
+  parentId       String?
+  name           String
+  sort           Int     @default(0)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  parent       StyleOption?  @relation("OptionTree", fields: [parentId], references: [id], onDelete: Restrict)
+  children     StyleOption[] @relation("OptionTree")
+  brandStyles     Style[] @relation("StyleBrandOption")
+  categoryStyles  Style[] @relation("StyleCategoryOption")
+  typeStyles      Style[] @relation("StyleTypeOption")
+  yearStyles      Style[] @relation("StyleYearOption")
+}
+
+model Material {
+  archivedAt DateTime?
+  id              String @id
+  organizationId  String
+  code            String
+  name            String
+  kind            String
+  specSummary     String
+  unit            String
+  imagePath       String @default("")
+  composition     String @default("")
+  gsm             String @default("")
+  widthCm         String @default("")
+  createdByUserId String @default("")
+  createdAt       String @default("")
+  demoNote        String
+
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  bomLines     BomLine[]
+  lots         InventoryLot[]
+  quotes       SupplierQuote[]
+  developmentCandidates DevelopmentCandidate[]
+  designProjects DesignProject[]
+  purchaseDrafts PurchaseDraft[]
+
+  @@unique([organizationId, code])
+}
+
+model BomLine {
+  id                    String  @id
+  styleVersionId        String
+  materialId            String
+  consumption           String
+  unit                  String
+  includesAllowance     Boolean @default(false)
+  allowanceRate         String  @default("0.03")
+  colorScope            String  @default("all")
+  confirmed             Boolean @default(true)
+
+  version  StyleVersion @relation(fields: [styleVersionId], references: [id], onDelete: Cascade)
+  material Material     @relation(fields: [materialId], references: [id])
+}
+
+model SizeScale {
+  id             String @id
+  organizationId String
+  name           String
+  sizesJson      String
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  skus         Sku[]
+}
+
+model Sku {
+  id         String @id
+  styleId    String
+  sizeScaleId String
+  colorName  String
+  sizeCode   String
+  skuCode    String
+
+  style     Style     @relation(fields: [styleId], references: [id], onDelete: Cascade)
+  sizeScale SizeScale @relation(fields: [sizeScaleId], references: [id])
+
+  @@unique([styleId, colorName, sizeCode])
+}
+
+model SalesOrder {
+  archivedAt DateTime?
+  id                    String    @id
+  organizationId        String
+  orderNo               String
+  customerId            String
+  factoryId             String?
+  status                String
+  productionReadiness   String
+  externalCustomerPo    String?
+  requestedDeliveryText String?
+  requestedDeliveryDate String?
+  deliveryYearInference String?
+  sourceDocumentId      String?
+  notes                 String?
+  createdByUserId       String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customer     Customer         @relation(fields: [customerId], references: [id])
+  factory      Party?           @relation("OrderFactory", fields: [factoryId], references: [id])
+  createdBy    User?            @relation("OrderCreator", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  source       SourceDocument?  @relation(fields: [sourceDocumentId], references: [id])
+  lines        OrderLine[]
+  tasks        TaskItem[]
+  allocations  InventoryAllocation[]
+  production   ProductionQty[]
+  purchaseDrafts PurchaseDraft[]
+  merchSheet   OrderMerchSheet?
+  packingPlans PackingPlan[]
+  reconDrafts  FactoryReconDraft[]
+  tradeContract TradeContract?
+  tradeBills TradeBill[]
+  tradeDocuments TradeDocument[]
+
+  @@unique([organizationId, orderNo])
+}
+
+model OrderLine {
+  id             String @id
+  orderId        String
+  styleId        String
+  styleVersionId String?
+  totalQuantity  Int
+  notes          String?
+
+  order   SalesOrder    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  style   Style         @relation(fields: [styleId], references: [id])
+  version StyleVersion? @relation(fields: [styleVersionId], references: [id])
+  colors  OrderColorQty[]
+  followStyle OrderMerchStyle?
+}
+
+model OrderColorQty {
+  id        String @id
+  lineId    String
+  colorName String
+  quantity  Int
+
+  line  OrderLine      @relation(fields: [lineId], references: [id], onDelete: Cascade)
+  sizes OrderSizeQty[]
+}
+
+model OrderSizeQty {
+  id      String @id
+  colorId String
+  sizeCode String
+  quantity Int
+
+  color OrderColorQty @relation(fields: [colorId], references: [id], onDelete: Cascade)
+}
+
+model SourceDocument {
+  id             String   @id
+  organizationId String
+  contentHash    String
+  origin         String
+  filename       String?
+  mimeType       String
+  rawText        String
+  receivedAt     DateTime
+  parseStatus    String
+  storagePath    String?
+  createdAt      DateTime @default(now())
+
+  organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  fragments    SourceFragment[]
+  jobs         AiJob[]
+  orders       SalesOrder[]
+  tasks        TaskItem[]
+  proposals    ActionProposal[]
+  developmentProjects DevelopmentProject[]
+  designProjects      DesignProject[]
+
+  @@unique([organizationId, contentHash])
+}
+
+model SourceFragment {
+  id               String @id
+  sourceDocumentId String
+  startOffset      Int
+  endOffset        Int
+  text             String
+
+  source SourceDocument @relation(fields: [sourceDocumentId], references: [id], onDelete: Cascade)
+}
+
+model AiJob {
+  id               String    @id
+  organizationId   String
+  sourceDocumentId String
+  mode             String
+  provider         String
+  status           String
+  attempt          Int       @default(0)
+  leaseUntil       DateTime?
+  outputJson       String?
+  errorMessage     String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  source       SourceDocument   @relation(fields: [sourceDocumentId], references: [id], onDelete: Cascade)
+  proposals    ActionProposal[]
+}
+
+model ActionProposal {
+  id               String    @id
+  organizationId   String
+  aiJobId          String
+  sourceDocumentId String
+  actionType       String
+  idempotencyKey   String
+  status           String
+  payloadJson      String
+  evidenceJson     String
+  risksJson        String
+  expectedJson     String
+  approvalRequired Boolean   @default(true)
+  createdAt        DateTime  @default(now())
+  decidedAt        DateTime?
+  decidedById      String?
+
+  organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  job          AiJob            @relation(fields: [aiJobId], references: [id], onDelete: Cascade)
+  source       SourceDocument   @relation(fields: [sourceDocumentId], references: [id], onDelete: Cascade)
+  execution    ActionExecution?
+
+  @@unique([organizationId, idempotencyKey])
+}
+
+model ActionExecution {
+  id           String   @id
+  proposalId   String   @unique
+  executedById String
+  status       String
+  resultJson   String
+  errorMessage String?
+  createdAt    DateTime @default(now())
+
+  proposal   ActionProposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+  executedBy User           @relation(fields: [executedById], references: [id])
+}
+
+model TaskItem {
+  id               String    @id
+  organizationId   String
+  title            String
+  kind             String
+  status           String
+  blocking         Boolean   @default(true)
+  assigneeRole     String?
+  relatedOrderId   String?
+  relatedStyleId   String?
+  sourceDocumentId String?
+  note             String?
+  createdAt        DateTime  @default(now())
+
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  order        SalesOrder?     @relation(fields: [relatedOrderId], references: [id])
+  style        Style?          @relation(fields: [relatedStyleId], references: [id])
+  source       SourceDocument? @relation(fields: [sourceDocumentId], references: [id])
+}
+
+model AuditEvent {
+  id             String   @id
+  organizationId String
+  actorUserId    String?
+  actorType      String
+  action         String
+  entityType     String
+  entityId       String
+  summary        String
+  payloadJson    String?
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  actor        User?        @relation(fields: [actorUserId], references: [id])
+}
+
+model ConfirmationRecord {
+  id          String   @id
+  orderId     String
+  materialId  String?
+  colorName   String
+  round       Int
+  status      String
+  evidence    String
+  createdAt   DateTime @default(now())
+}
+
+model SupplierQuote {
+  id             String @id
+  organizationId String
+  supplierId     String
+  materialId     String
+  unit           String
+  unitPriceMinor Int
+  currency       String @default("CNY")
+  moq            String
+  multiple       String
+  validFrom      String
+  demoNote       String
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  supplier     Party        @relation(fields: [supplierId], references: [id])
+  material     Material     @relation(fields: [materialId], references: [id])
+}
+
+model InventoryLot {
+  id             String @id
+  organizationId String
+  materialId     String
+  locationId     String
+  ownerKind      String
+  colorName      String
+  qtyOnHand      String
+  qtyAllocated   String
+  qtyInbound     String  @default("0")
+  qualityStatus  String
+  availableFrom  String
+  inboundEta     String?
+  inboundNo      String?
+  demoNote       String
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  material     Material     @relation(fields: [materialId], references: [id])
+  location     Party        @relation(fields: [locationId], references: [id])
+  allocations  InventoryAllocation[]
+}
+
+model InventoryMovement {
+  id               String   @id
+  organizationId   String
+  materialId       String
+  kind             String
+  fromLotId        String?
+  toLotId          String?
+  fromLocationId   String?
+  toLocationId     String?
+  qty              String
+  idempotencyKey   String
+  note             String?
+  createdAt        DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, idempotencyKey])
+}
+
+model InventoryAllocation {
+  id         String @id
+  lotId      String
+  orderId    String
+  qty        String
+  status     String
+  createdAt  DateTime @default(now())
+
+  lot   InventoryLot @relation(fields: [lotId], references: [id], onDelete: Cascade)
+  order SalesOrder   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+}
+
+model PurchaseDraft {
+  id               String   @id
+  organizationId   String
+  orderId          String
+  materialId       String
+  optionCode       String
+  qty              String
+  amountYuan       String
+  allocatedFree    String
+  reservedInbound  String
+  status           String
+  idempotencyKey   String
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  order        SalesOrder   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  material     Material     @relation(fields: [materialId], references: [id])
+
+  @@unique([orderId, materialId])
+  @@unique([organizationId, idempotencyKey])
+}
+
+model DevelopmentProject {
+  archivedAt DateTime?
+  id               String   @id
+  organizationId   String
+  code             String
+  name             String
+  customerId       String?
+  styleId          String?
+  sourceDocumentId String?
+  status           String
+  unknownsJson     String
+  craftFamily      String   @default("")
+  sheetJson        String   @default("{}")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  style        Style?          @relation(fields: [styleId], references: [id])
+  source       SourceDocument? @relation(fields: [sourceDocumentId], references: [id])
+  candidates   DevelopmentCandidate[]
+  reuseEvents  KnowledgeReuseEvent[]
+  designProjects DesignProject[]
+  patternRevisions PatternRevision[]
+  patternSamples PatternSample[]
+  handoffs PatternHandoff[]
+
+  @@unique([organizationId, code])
+}
+
+model PatternRevision {
+  stageRevisionId String?
+  id String @id
+  projectId String
+  number Int
+  parentId String?
+  craftFamily String
+  sheetJson String
+  reason String
+  createdBy String
+  createdByName String
+  createdAt DateTime @default(now())
+  project DevelopmentProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  samples PatternSample[]
+  @@unique([projectId, number])
+}
+
+// Cross-stage documents are append-only revisions. Legacy records are not backfilled implicitly.
+model WorkflowStage {
+  id String @id
+  organizationId String
+  kind String
+  projectId String? @unique
+  followRowId String? @unique
+  styleId String?
+  ownerId String
+  sourceRevisionId String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  revisions WorkflowRevision[]
+  participants WorkflowParticipant[]
+  @@index([organizationId, kind])
+}
+
+model WorkflowRevision {
+  id String @id
+  stageId String
+  number Int
+  constructionJson String @default("[]")
+  reason String
+  sourceSnapshotJson String @default("{}")
+  createdBy String
+  createdAt DateTime @default(now())
+  stage WorkflowStage @relation(fields: [stageId], references: [id], onDelete: Restrict)
+  @@unique([stageId, number])
+}
+
+model WorkflowTransfer {
+  id String @id
+  organizationId String
+  sourceStageId String
+  sourceRevisionId String
+  sourceVersionKey String @default("")
+  targetStageId String @unique
+  targetSheetId String
+  targetRowId String
+  kind String
+  batchKey String
+  requestKey String
+  requestHash String
+  snapshotJson String
+  createdBy String
+  createdAt DateTime @default(now())
+  @@unique([organizationId, requestKey])
+  @@unique([sourceVersionKey, kind, batchKey])
+}
+
+model WorkflowParticipant {
+  stageId String
+  userId String
+  stage WorkflowStage @relation(fields: [stageId], references: [id], onDelete: Restrict)
+  @@id([stageId, userId])
+}
+
+model WorkflowRead {
+  organizationId String
+  auditId String
+  userId String
+  readAt DateTime @default(now())
+  @@id([auditId, userId])
+  @@index([organizationId, userId])
+}
+
+model PatternSample {
+  id String @id
+  projectId String
+  revisionId String
+  factoryId String
+  round Int
+  quantity Int
+  dueDate String @default("")
+  requirements String @default("")
+  quoteJson String @default("{}")
+  feedbackJson String @default("{}")
+  internalOpinion String @default("")
+  ownerId String
+  issuedAt DateTime?
+  issuedById String?
+  receivedAt DateTime?
+  receivedById String?
+  createdBy String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  project DevelopmentProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  revision PatternRevision @relation(fields: [revisionId], references: [id], onDelete: Restrict)
+  @@unique([projectId, factoryId, round])
+}
+
+model OrderMerchSheet {
+  archivedAt DateTime?
+  id               String   @id
+  organizationId   String
+  salesOrderId     String?  @unique
+  seasonCode       String   @default("")
+  kind             String   @default("")
+  title            String   @default("")
+  factoryName      String   @default("")
+  factoryId        String?
+  customerId       String?
+  craftFamily      String   @default("")
+  salesSampleJson  String   @default("{}")
+  bulkJson         String   @default("{}")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  order        SalesOrder?  @relation(fields: [salesOrderId], references: [id], onDelete: Cascade)
+  styles       OrderMerchStyle[]
+  changes      FollowChange[]
+}
+
+model OrderMerchStyle {
+  id              String @id
+  sheetId         String
+  sort            Int
+  styleCode       String @default("")
+  styleName       String @default("")
+  craftFamily     String @default("")
+  imagePath       String @default("")
+  labDipJson      String @default("{}")
+  salesSampleJson String @default("{}")
+  bulkJson        String @default("{}")
+  productionLineId String? @unique
+
+  sheet OrderMerchSheet @relation(fields: [sheetId], references: [id], onDelete: Cascade)
+  productionLine OrderLine? @relation(fields: [productionLineId], references: [id], onDelete: Restrict)
+
+  @@index([sheetId])
+}
+
+model FollowChange {
+  id String @id
+  organizationId String
+  sheetId String
+  status String
+  reason String
+  sourceReference String
+  beforeJson String
+  afterJson String
+  impactJson String
+  baseStamp String
+  requestedBy String
+  decidedBy String?
+  decisionNote String @default("")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  sheet OrderMerchSheet @relation(fields: [sheetId], references: [id], onDelete: Restrict)
+  @@index([organizationId, sheetId, status])
+}
+
+model PatternHandoff {
+  id String @id
+  organizationId String
+  projectId String
+  sampleId String
+  revisionId String
+  styleVersionId String
+  snapshotJson String
+  createdBy String
+  createdAt DateTime @default(now())
+  project DevelopmentProject @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  @@unique([projectId, sampleId])
+}
+
+model DevelopmentCandidate {
+  id              String @id
+  projectId       String
+  kind            String
+  materialId      String?
+  styleId         String?
+  copyMode        String
+  unconfirmedJson String
+  note            String
+
+  project  DevelopmentProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  material Material?          @relation(fields: [materialId], references: [id])
+  style    Style?             @relation(fields: [styleId], references: [id])
+}
+
+model DesignProject {
+  id                   String   @id
+  organizationId       String
+  code                 String
+  name                 String
+  brief                String   @default("")
+  intent               String
+  status               String
+  styleId              String?
+  materialId           String?
+  developmentProjectId String?
+  sourceDocumentId     String?
+  createdByUserId      String
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  organization Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  style        Style?               @relation(fields: [styleId], references: [id])
+  material     Material?            @relation(fields: [materialId], references: [id])
+  development  DevelopmentProject?  @relation(fields: [developmentProjectId], references: [id])
+  source       SourceDocument?      @relation(fields: [sourceDocumentId], references: [id])
+  createdBy    User                 @relation("DesignCreator", fields: [createdByUserId], references: [id])
+  assets       DesignAsset[]
+  rounds       DesignRound[]
+
+  @@unique([organizationId, code])
+}
+
+model DesignAsset {
+  id         String   @id
+  projectId  String
+  kind       String
+  label      String
+  imagePath  String
+  mimeType   String
+  note       String   @default("")
+  createdAt  DateTime @default(now())
+
+  project DesignProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model DesignRound {
+  id             String   @id
+  projectId      String
+  versionNumber  Int
+  kind           String
+  intent         String
+  prompt         String
+  instruction    String   @default("")
+  referenceJson  String
+  mode           String
+  provider       String
+  model          String
+  status         String
+  errorMessage   String?
+  createdAt      DateTime @default(now())
+
+  project  DesignProject    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  variants DesignVariant[]
+
+  @@unique([projectId, versionNumber])
+}
+
+model DesignVariant {
+  id        String   @id
+  roundId   String
+  slot      String
+  label     String
+  imagePath String
+  mimeType  String
+  prompt    String
+  selected  Boolean  @default(false)
+  origin    String
+  createdAt DateTime @default(now())
+
+  round DesignRound @relation(fields: [roundId], references: [id], onDelete: Cascade)
+}
+
+model KnowledgeReuseEvent {
+  id               String   @id
+  organizationId   String
+  query            String
+  candidateKind    String
+  candidateId      String
+  matchMethod      String
+  matchReasonsJson String
+  differencesJson  String
+  status           String
+  rejectReason     String?
+  adoptedProjectId String?
+  actorUserId      String?
+  createdAt        DateTime @default(now())
+
+  organization Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project      DevelopmentProject? @relation(fields: [adoptedProjectId], references: [id])
+}
+
+model ProductionQty {
+  id          String @id
+  orderId     String
+  kind        String
+  quantity    Int
+  idempotencyKey String
+  note        String?
+  createdAt   DateTime @default(now())
+
+  order SalesOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  lines ProductionQtyLine[]
+
+  @@unique([orderId, idempotencyKey])
+}
+
+model ProductionQtyLine {
+  id              String @id
+  productionQtyId String
+  colorName       String
+  sizeCode        String
+  quantity        Int
+
+  production ProductionQty @relation(fields: [productionQtyId], references: [id], onDelete: Cascade)
+}
+
+model PackingPlan {
+  id               String   @id
+  organizationId   String
+  orderId          String
+  status           String
+  totalQty         Int
+  idempotencyKey   String
+  note             String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  order        SalesOrder     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  cartons      PackingCarton[]
+
+  @@unique([organizationId, idempotencyKey])
+}
+
+model PackingCarton {
+  id           String  @id
+  planId       String
+  cartonNo     String
+  netWeight    String?
+  grossWeight  String?
+  weightStatus String  @default("pending")
+
+  plan  PackingPlan        @relation(fields: [planId], references: [id], onDelete: Cascade)
+  lines PackingCartonLine[]
+
+  @@unique([planId, cartonNo])
+}
+
+model PackingCartonLine {
+  id        String @id
+  cartonId  String
+  colorName String
+  sizeCode  String
+  quantity  Int
+
+  carton PackingCarton @relation(fields: [cartonId], references: [id], onDelete: Cascade)
+}
+
+model FactoryReconDraft {
+  id             String   @id
+  organizationId String
+  orderId        String
+  factoryId      String?
+  status         String
+  shippedQty     Int
+  unitPriceYuan  String?
+  amountYuan     String?
+  basisNote      String
+  paid           Boolean  @default(false)
+  idempotencyKey String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  order        SalesOrder   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, idempotencyKey])
+  @@unique([orderId])
+}
+
+// Operational trade ledger. These records never issue a bank payment or post GL entries.
+model TradeBook {
+  organizationId String @id
+  revision Int @default(0)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+}
+
+model TradeOperation {
+  id String @id
+  organizationId String
+  idempotencyKey String
+  requestHash String
+  resultJson String
+  createdAt String
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  @@unique([organizationId, idempotencyKey])
+}
+
+model TradeContract {
+  id String @id
+  organizationId String
+  orderId String @unique
+  currency String
+  amountMinor BigInt
+  tradeMode String
+  incoterm String
+  terms String
+  version Int @default(1)
+  createdBy String
+  createdAt String
+  updatedAt String
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  order SalesOrder @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  @@index([organizationId, updatedAt])
+}
+
+model TradeBill {
+  id String @id
+  organizationId String
+  orderId String?
+  projectId String?
+  followRowId String?
+  subjectJson String?
+  expenseDate String?
+  expenseReference String?
+  direction String
+  partyKind String
+  partyId String
+  title String
+  category String
+  currency String
+  amountMinor BigInt
+  dueDate String
+  basis String
+  packingPlanId String?
+  sourceKind String @default("manual")
+  sourceId String?
+  sourceSnapshot String?
+  status String @default("draft")
+  version Int @default(1)
+  createdBy String
+  createdAt String
+  confirmedAt String?
+  voidReason String?
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  order SalesOrder? @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  allocations TradeAllocation[]
+  adjustments TradeAdjustment[]
+  @@index([organizationId, direction, status, dueDate])
+  @@index([organizationId, orderId])
+  @@index([organizationId, sourceKind, sourceId])
+  @@index([organizationId, projectId])
+  @@index([organizationId, followRowId])
+}
+
+model TradeCash {
+  id String @id
+  organizationId String
+  direction String
+  partyKind String
+  partyId String
+  currency String
+  amountMinor BigInt
+  feeMinor BigInt
+  bankAccount String
+  bankReference String
+  occurredOn String
+  basis String
+  baseCurrency String?
+  baseAmountMinor BigInt?
+  exchangeRate String?
+  rateDate String?
+  rateSource String?
+  status String @default("recorded")
+  version Int @default(1)
+  createdBy String
+  createdAt String
+  voidReason String?
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  allocations TradeAllocation[]
+  @@index([organizationId, direction, status, occurredOn])
+  @@index([organizationId, bankAccount, bankReference])
+  @@index([organizationId, partyKind, partyId])
+}
+
+model TradeAllocation {
+  id String @id
+  organizationId String
+  billId String
+  cashId String
+  billAmountMinor BigInt
+  cashAmountMinor BigInt
+  exchangeRate String
+  rateDate String
+  rateSource String
+  status String @default("active")
+  createdBy String
+  createdAt String
+  reversedBy String?
+  reversedAt String?
+  reversalReason String?
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  bill TradeBill @relation(fields: [billId], references: [id], onDelete: Restrict)
+  cash TradeCash @relation(fields: [cashId], references: [id], onDelete: Restrict)
+  @@index([organizationId, billId, status])
+  @@index([organizationId, cashId, status])
+}
+
+model TradeAdjustment {
+  id String @id
+  organizationId String
+  billId String
+  amountMinor BigInt
+  reason String
+  createdBy String
+  createdAt String
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  bill TradeBill @relation(fields: [billId], references: [id], onDelete: Restrict)
+  @@index([organizationId, billId])
+}
+
+model TradeDocument {
+  id String @id
+  organizationId String
+  orderId String?
+  kind String
+  number String
+  issuedOn String
+  note String
+  billId String?
+  cashId String?
+  packingPlanId String?
+  filename String?
+  mimeType String?
+  storagePath String?
+  contentHash String?
+  status String @default("active")
+  createdBy String
+  createdAt String
+  voidReason String?
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  order SalesOrder? @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  @@index([organizationId, orderId, status])
+  @@index([organizationId, kind, issuedOn])
+}
+
+model MaterialReceipt {
+  inboundLotId String?
+  id String @id
+  organizationId String
+  orderId String
+  supplierId String
+  materialId String
+  lotId String @unique
+  movementId String @unique
+  purchaseDraftId String?
+  reference String
+  receivedOn String
+  qtyMilli BigInt
+  currency String?
+  unitPriceMicros BigInt?
+  valuationVersion Int @default(0)
+  version Int @default(1)
+  status String @default("active")
+  basis String
+  createdBy String
+  createdAt String
+  organization Organization @relation(fields:[organizationId],references:[id],onDelete:Restrict)
+  valuations MaterialValuation[]
+  origins MaterialLotOrigin[]
+  uses MaterialUse[]
+  events MaterialEvent[]
+  @@unique([organizationId,reference])
+  @@index([organizationId,orderId,status])
+  @@index([organizationId,purchaseDraftId])
+}
+model MaterialValuation {
+  id String @id
+  organizationId String
+  receiptId String
+  version Int
+  currency String
+  unitPriceMicros BigInt
+  basis String
+  createdBy String
+  createdAt String
+  organization Organization @relation(fields:[organizationId],references:[id],onDelete:Restrict)
+  receipt MaterialReceipt @relation(fields:[receiptId],references:[id],onDelete:Restrict)
+  @@unique([receiptId,version])
+}
+model MaterialLotOrigin {
+  lotId String @id
+  organizationId String
+  receiptId String
+  organization Organization @relation(fields:[organizationId],references:[id],onDelete:Restrict)
+  receipt MaterialReceipt @relation(fields:[receiptId],references:[id],onDelete:Restrict)
+  @@index([organizationId,receiptId])
+}
+model MaterialUse {
+  movementId String @id
+  organizationId String
+  lotId String
+  receiptId String?
+  orderId String?
+  qtyMilli BigInt
+  currency String?
+  unitPriceMicros BigInt?
+  basis String?
+  version Int @default(1)
+  createdBy String
+  createdAt String
+  organization Organization @relation(fields:[organizationId],references:[id],onDelete:Restrict)
+  receipt MaterialReceipt? @relation(fields:[receiptId],references:[id],onDelete:Restrict)
+  @@index([organizationId,orderId])
+  @@index([organizationId,receiptId])
+}
+model MaterialEvent {
+  id String @id
+  organizationId String
+  movementId String @unique
+  receiptId String?
+  useId String?
+  kind String
+  lotId String
+  qtyMilli BigInt
+  reversesId String? @unique
+  transferId String? @unique
+  status String @default("active")
+  basis String
+  createdBy String
+  createdAt String
+  organization Organization @relation(fields:[organizationId],references:[id],onDelete:Restrict)
+  receipt MaterialReceipt? @relation(fields:[receiptId],references:[id],onDelete:Restrict)
+  @@index([organizationId,receiptId,kind,status])
+  @@index([organizationId,useId,kind,status])
+}
+model OrderCostTag {
+  billId String @id
+  organizationId String
+  kind String
+  active Boolean @default(true)
+  basis String
+  createdBy String
+  createdAt String
+  organization Organization @relation(fields:[organizationId],references:[id],onDelete:Restrict)
+  @@index([organizationId,active])
+}
+
+model TreasuryRefund {
+  id String @id
+  organizationId String
+  sourceCashId String
+  counterCashId String @unique
+  amountMinor BigInt
+  status String @default("active")
+  basis String
+  createdBy String
+  createdAt String
+  voidReason String?
+  organization Organization @relation(fields:[organizationId],references:[id],onDelete:Restrict)
+  @@index([organizationId,sourceCashId,status])
+}
+model TreasuryFx {
+  id String @id
+  organizationId String
+  sourceCashId String
+  outCashId String @unique
+  inCashId String @unique
+  fromCurrency String
+  toCurrency String
+  fromMinor BigInt
+  toMinor BigInt
+  feeMinor BigInt
+  rate String
+  rateDate String
+  occurredOn String
+  bankReference String
+  basis String
+  status String @default("active")
+  createdBy String
+  createdAt String
+  voidReason String?
+  organization Organization @relation(fields:[organizationId],references:[id],onDelete:Restrict)
+  @@index([organizationId,sourceCashId,status])
+}
+model TreasuryLeg {
+  cashId String @id
+  organizationId String
+  kind String
+  ownerId String
+  organization Organization @relation(fields:[organizationId],references:[id],onDelete:Restrict)
+  @@index([organizationId,ownerId])
+}
+model GLBook {
+  id String @id
+  organizationId String
+  name String
+  baseCurrency String
+  startMonth String
+  mode String @default("demo")
+  createdBy String
+  createdAt String
+  organization Organization @relation(fields:[organizationId],references:[id],onDelete:Restrict)
+  accounts GLAccount[]
+  periods GLPeriod[]
+  journals GLJournal[]
+  claims GLSourceClaim[]
+  @@unique([organizationId,name])
+}
+model GLAccount {
+  id String @id
+  bookId String
+  code String
+  name String
+  category String
+  active Boolean @default(true)
+  createdAt String
+  book GLBook @relation(fields:[bookId],references:[id],onDelete:Restrict)
+  lines GLLine[]
+  @@unique([bookId,code])
+}
+model GLPeriod {
+  id String @id
+  bookId String
+  month String
+  status String @default("open")
+  nextNumber Int @default(1)
+  closeNote String?
+  closedBy String?
+  closedAt String?
+  book GLBook @relation(fields:[bookId],references:[id],onDelete:Restrict)
+  @@unique([bookId,month])
+}
+model GLJournal {
+  id String @id
+  bookId String
+  date String
+  summary String
+  basis String
+  status String @default("draft")
+  version Int @default(1)
+  number String?
+  sourceType String @default("manual")
+  sourceId String?
+  sourceHash String?
+  sourceJson String?
+  expectedTotalMinor BigInt?
+  reversesId String?
+  reversedById String?
+  createdBy String
+  createdAt String
+  reviewedBy String?
+  reviewedAt String?
+  postedBy String?
+  postedAt String?
+  voidReason String?
+  book GLBook @relation(fields:[bookId],references:[id],onDelete:Restrict)
+  lines GLLine[]
+  claims GLSourceClaim[]
+  @@unique([bookId,number])
+  @@index([bookId,date,status])
+  @@index([bookId,reversesId,status])
+}
+model GLLine {
+  id String @id
+  journalId String
+  accountId String
+  lineNo Int
+  accountCode String
+  accountName String
+  debitMinor BigInt
+  creditMinor BigInt
+  note String
+  journal GLJournal @relation(fields:[journalId],references:[id],onDelete:Restrict)
+  account GLAccount @relation(fields:[accountId],references:[id],onDelete:Restrict)
+  @@unique([journalId,lineNo])
+  @@index([accountId,journalId])
+}
+model GLSourceClaim {
+  id String @id
+  bookId String
+  journalId String
+  sourceType String
+  sourceId String
+  activeKey String?
+  book GLBook @relation(fields:[bookId],references:[id],onDelete:Restrict)
+  journal GLJournal @relation(fields:[journalId],references:[id],onDelete:Restrict)
+  @@unique([bookId,activeKey])
+  @@index([sourceType,sourceId])
+}
+
+model FactoryTransfer {
+  receivedAt        DateTime?
+  receivedBy        String?
+  receiptNote       String @default("")
+  id                String   @id
+  organizationId    String
+  orderId           String
+  fromFactoryId     String
+  toFactoryId       String
+  status            String
+  reason            String
+  sourceReference   String
+  selectionJson     String
+  beforeJson        String
+  afterJson         String   @default("{}")
+  baseStamp         String
+  requestedBy       String
+  reviewedBy        String?
+  reviewNote        String   @default("")
+  decidedBy         String?
+  decisionNote      String   @default("")
+  newOrderId        String?
+  idempotencyKey    String
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@unique([organizationId, idempotencyKey])
+  @@index([organizationId, orderId, status])
+  @@index([organizationId, fromFactoryId])
+  @@index([organizationId, toFactoryId])
+}
+
+model StyleCodeAlias {
+  id String @id
+  organizationId String
+  styleId String
+  code String
+  createdAt DateTime @default(now())
+  @@unique([organizationId, code])
+  @@index([styleId])
+}

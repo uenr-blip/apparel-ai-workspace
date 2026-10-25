@@ -1,0 +1,53 @@
+/* A dedicated paper layout. Screen table rowspans and sticky cells never enter it. */
+.follow-print-root .print-factory { margin-top: 5mm; }
+.follow-print-root .print-factory:first-child { margin-top: 0; }
+.print-factory-title { margin: 0 0 2mm; font-size: 11pt; font-weight: 700; break-after: avoid; }
+.print-factory-title span { margin-left: 4mm; font-size: 8pt; font-weight: 400; }
+.print-style-table { width: 100%; table-layout: fixed; border-collapse: collapse; margin: 0 0 2mm; color: #222; background: #fff; font: 9pt/1.25 Arial, "PingFang SC", "Microsoft YaHei", sans-serif; }
+.print-style-table th, .print-style-table td { border: 0.3mm solid #c5c5c5; padding: 0.8mm 1.4mm; text-align: left; vertical-align: top; overflow-wrap: anywhere; white-space: normal; }
+.print-style-table .print-col-color { width: 29%; }
+.print-style-table .print-col-quantity { width: 8%; }
+.print-style-table thead { display: table-header-group; }
+.print-style-table tbody { break-inside: auto; }
+.print-style-table th { font-weight: 600; background: #f3f3f3; }
+.print-style-table .print-style-heading { padding: 1.5mm 2mm; background: #fff; }
+.print-style-identity { display: flex; align-items: flex-start; gap: 3mm; }
+.print-style-image { flex: 0 0 11mm; }
+.print-style-image img { display: block; width: 11mm; height: 13mm; object-fit: contain; }
+.print-style-name { flex: 1; min-width: 0; font-size: 10pt; }
+.print-style-name > div { font-size: 8pt; font-weight: 400; margin-top: 1mm; }
+.print-style-batch { flex: 0 0 30%; font-size: 9pt; }
+.print-style-batch > div { font-size: 8pt; font-weight: 400; margin-top: 1mm; }
+.print-batch-dates { margin-top: 1mm; font-size: 8pt; font-weight: 400; }
+.print-color-row { break-inside: avoid; }
+.print-row-number { margin-right: 2mm; color: #666; font-size: 8pt; }
+.print-factory-color, .print-field-label, .print-empty { color: #555; }
+.print-factory-color { display: inline; margin-left: 2mm; font-size: 8pt; }
+.print-style-table .print-quantity { text-align: right; font-variant-numeric: tabular-nums; }
+.print-style-table a { color: inherit; text-decoration: none; }
+.print-wide-notes tr { break-inside: auto; }
+.print-wide-notes td { padding: 0.8mm 1.4mm; font-size: 8.5pt; }
+.print-wide-notes strong { font-weight: 600; }
+.print-note-text { white-space: normal; overflow-wrap: anywhere; }
+.print-detail + .print-detail::before { content: " · "; color: #777; }
+.print-legend { font-size: 8pt; color: #555; }
+.print-picture-notes tr { break-inside: avoid; }
+.print-picture-groups { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 3mm; }
+.print-field-pictures { font-size: 8pt; }
+.print-field-pictures strong { display: block; margin-bottom: 1mm; }
+.print-field-pictures > div { display: flex; flex-wrap: wrap; gap: 2mm; }
+.print-field-pictures img { width: 12mm; height: 12mm; object-fit: contain; }
+
+@page follow-master-large { size: A3 landscape; margin: 10mm; }
+@media print {
+  body:has(.follow-print-root) .atmosphere { display: none !important; }
+  .follow-print-root[data-paper="a3"] { page: follow-master-large; }
+  .follow-print-root .print-options { display: none !important; }
+  .follow-print-root .master-toolbar { margin-bottom: 2mm; }
+  .follow-print-root .master-toolbar p { margin: 1mm 0; font-size: 8pt; line-height: 1.25; }
+  .follow-print-root .master-toolbar h2 { font-size: 13pt; line-height: 1.2; }
+  .follow-print-root .print-style-table { min-width: 0; }
+  .follow-print-root .print-style-table th { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+  .follow-print-root .print-factory { break-inside: auto; }
+  .follow-print-root[data-separate-factories="true"] .print-factory + .print-factory { break-before: page; }
+}

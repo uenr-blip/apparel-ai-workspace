@@ -1,0 +1,57 @@
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 360px), 1fr));
+  gap: 14px;
+}
+
+.card {
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr);
+  grid-template-rows: 1fr auto;
+  column-gap: 16px;
+  border: 1px solid var(--line-strong);
+  border-radius: 16px;
+  padding: 14px;
+  background: var(--surface-solid);
+  box-shadow: 0 2px 8px rgb(30 25 15 / 3%);
+  transition: border-color 150ms;
+}
+
+.card:hover, .card:focus-within { border-color: var(--brand); }
+.picture {
+  grid-row: 1 / 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 10px;
+  background: var(--paper);
+  min-height: 156px;
+}
+.picture img { width: 100%; height: 156px; object-fit: contain; }
+.body { min-width: 0; }
+.heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 8px; }
+.code { min-width: 0; font-size: 16px; line-height: 1.4; font-weight: 650; overflow-wrap: anywhere; }
+.factories { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 5px; margin-left: auto; min-width: 0; max-width: 100%; }
+.factory { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; padding: 4px 9px 4px 5px; border: 1px solid color-mix(in srgb, var(--gold) 55%, var(--brand)); border-radius: 999px; background: linear-gradient(145deg, color-mix(in srgb, var(--brand) 88%, white), var(--brand-strong)); color: var(--on-brand); font-size: 11px; font-weight: 600; line-height: 1.4; box-shadow: inset 0 1px 0 rgb(255 255 255 / 20%), 0 2px 5px rgb(20 35 28 / 12%); }
+.factory svg { flex-shrink: 0; }
+.factory span { min-width: 0; overflow-wrap: anywhere; }
+.factory .factoryIcon { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; flex-shrink: 0; border-radius: 50%; background: color-mix(in srgb, var(--on-brand) 12%, transparent); box-shadow: inset 0 1px 0 color-mix(in srgb, var(--on-brand) 15%, transparent); }
+.factoryArrow { opacity: .7; }
+.factoryLink { text-decoration: none; transition: transform 150ms, box-shadow 150ms, border-color 150ms; }
+.factoryLink:hover { transform: translateY(-1px); border-color: var(--gold); box-shadow: inset 0 1px 0 rgb(255 255 255 / 25%), 0 4px 8px rgb(20 35 28 / 18%); }
+.factoryLink:active { transform: translateY(0); }
+.card .factoryLink:focus-visible { border-radius: 999px; }
+.factoryPending { padding: 4px 9px; border-color: var(--line); background: var(--paper); color: var(--ink-muted); font-weight: 400; box-shadow: none; }
+.name { margin-top: 4px; font-size: 13px; line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.meta { display: flex; flex-wrap: wrap; gap: 3px 10px; margin-top: 8px; font-size: 11px; line-height: 1.5; color: var(--ink-muted); }
+.po { display: block; margin-top: 7px; font-size: 11px; line-height: 1.5; color: var(--brand-strong); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.actions { display: flex; flex-wrap: wrap; gap: 4px 14px; border-top: 1px solid var(--line); padding-top: 9px; margin-top: 10px; font-size: 12px; color: var(--brand-strong); }
+.card a:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; border-radius: 4px; }
+.actions a:hover, .po:hover { text-decoration: underline; text-underline-offset: 3px; }
+@media (max-width: 440px) {
+  .card { grid-template-columns: 88px minmax(0, 1fr); padding: 11px; column-gap: 12px; }
+  .picture img { height: 138px; }
+  .picture { min-height: 138px; }
+}
+@media (prefers-reduced-motion: reduce) { .card, .factoryLink { transition: none; } .factoryLink:hover { transform: none; } }

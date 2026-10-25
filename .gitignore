@@ -1,0 +1,87 @@
+# dependencies
+/node_modules
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# testing
+/coverage
+/test-results
+/playwright-report
+/blob-report
+/playwright/.cache
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# env files
+.env
+.env*.local
+!.env.example
+/deploy/pilot.env
+/deploy/data/
+/deploy/tls/
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# local databases and private attachments
+/prisma/*.db
+/prisma/*.db-journal
+/prisma/*.db-wal
+/prisma/*.db-shm
+/prisma/**/*.db
+/prisma/**/*.db-journal
+/prisma/**/*.db-wal
+/prisma/**/*.db-shm
+/storage
+/output/pilot/
+.scaffold
+
+# local working data and audit artifacts (never publish)
+/tmp/
+/output/
+/demo/*.db
+/demo/*.db-*
+/MEMORY.md
+.env.*
+!.env.example
+*.sqlite
+*.sqlite3
+*.db.backup
+*.zip
+*.tar.gz
+*.db
+*.db-*
+*.key
+*.p12
+*.pfx
+*.bak
+*.backup
+
+# private deployment records
+/docs/ALIYUN_PILOT_DEPLOYMENT.md
+/docs/PILOT_RUNBOOK.md
+/docs/SS27_PILOT_DELIVERY_STATUS.md
